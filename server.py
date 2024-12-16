@@ -1,18 +1,43 @@
 from flask import Flask, request, jsonify
+from flask_mysqldb import MySQL
 import easyocr
 import os
+# import mysql.connector
 
 app = Flask(__name__)
 
-php_server_url = "http://localhost/esp-project-ocr/save_ocr.php"
+# Required
+app.config["MYSQL_USER"] = "root"
+app.config["MYSQL_PASSWORD"] = ""
+app.config["MYSQL_DB"] = "ocr_db"
+
+mysql = MySQL(app)
+
 
 # Initialize EasyOCR reader
 reader = easyocr.Reader(['id'], gpu=False)
+print("EasyOCR initialized successfully.")
 
+
+# Directory to save uploaded images
+UPLOAD_FOLDER = "uploads"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+# endpoind home
 @app.route('/')
 def home():
-    return "Hello OCR with EasyOCR and Flask"
+    cursor = mysql.connection.cursor()
+    cursor.execute("""SELECT * from ocr_results""")
+    rv = cursor.fetchall()
+    return {
+        "status": "succes",
+        "data": rv
+    }
 
+
+
+
+# endpoind upload
 @app.route('/upload', methods=['POST'])
 def upload_image():
     if 'file' not in request.files:
@@ -23,16 +48,30 @@ def upload_image():
         return jsonify({"error": "No selected file"}), 400
 
     # Save uploaded image
-    image_path = os.path.join("uploads", file.filename)
+    image_path = os.path.join(UPLOAD_FOLDER, file.filename)
     file.save(image_path)
 
     # Perform OCR
     try:
-        result = reader.readtext(image_path, detail=0)
-        return jsonify({"text": result})
+         # Perform OCR
+        ocr_result = reader.readtext(image_path, detail=0)  # Extract text only
+        ocr_text = " ".join(ocr_result)
+
+        # save to db
+        cursor = mysql.connection.cursor()
+        sql = "INSERT INTO ocr_results (image_name, ocr_text) VALUES (%s, %s)"
+        val = (file.filename, ocr_text)
+        cursor.execute(sql, val)
+        mysql.connection.commit()
+        cursor.close()
+
+        return jsonify({
+            "message": "OCR processing and save to db",
+            "text": ocr_result
+        })
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    os.makedirs("uploads", exist_ok=True)
-    app.run(host='0.0.0.0', port=5000)
+    app.run(debug=True)
