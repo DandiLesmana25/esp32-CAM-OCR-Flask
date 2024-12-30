@@ -53,6 +53,8 @@ def upload_image():
 
     # Perform OCR
     try:
+        # load model
+        # path model
          # Perform OCR
         ocr_result = reader.readtext(image_path, detail=0)  # Extract text only
         ocr_text = " ".join(ocr_result)
