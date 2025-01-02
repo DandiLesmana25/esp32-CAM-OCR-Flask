@@ -1,0 +1,10 @@
+CREATE DATABASE ocr_db;
+
+USE ocr_db;
+
+CREATE TABLE ocr_results (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    image_name VARCHAR(255) NOT NULL,
+    ocr_text TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
