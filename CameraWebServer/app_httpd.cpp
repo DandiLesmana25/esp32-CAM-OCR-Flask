@@ -1,6 +1,17 @@
-#include <Arduino.h>
+// Copyright 2015-2016 Espressif Systems (Shanghai) PTE LTD
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 #include "esp_http_server.h"
-#include "esp_http_client.h"
 #include "esp_timer.h"
 #include "esp_camera.h"
 #include "img_converters.h"
@@ -8,7 +19,6 @@
 #include "esp32-hal-ledc.h"
 #include "sdkconfig.h"
 #include "camera_index.h"
-
 
 #if defined(ARDUINO_ARCH_ESP32) && defined(CONFIG_ARDUHAL_ESP_LOG)
 #include "esp32-hal-log.h"
@@ -29,10 +39,6 @@
 #define CONFIG_ESP_FACE_DETECT_ENABLED      0
 #define CONFIG_ESP_FACE_RECOGNITION_ENABLED 0
 #endif
-
-// const char*servername
-const char *servername = "http://127.0.0.1:5000/upload";
-const char *postdata = "&esp32capture";
 
 #if CONFIG_ESP_FACE_DETECT_ENABLED
 
@@ -68,6 +74,8 @@ const char *postdata = "&esp32capture";
 #endif
 
 
+const char *servername = "http://127.0.0.1:5000/upload";
+const char *postdata = "&esp32capture";
 
 // Enable LED FLASH setting
 #define CONFIG_LED_ILLUMINATOR_ENABLED 1
@@ -99,6 +107,13 @@ httpd_handle_t camera_httpd = NULL;
 #if CONFIG_ESP_FACE_DETECT_ENABLED
 
 static int8_t detection_enabled = 0;
+
+// #if TWO_STAGE
+// static HumanFaceDetectMSR01 s1(0.1F, 0.5F, 10, 0.2F);
+// static HumanFaceDetectMNP01 s2(0.5F, 0.3F, 5);
+// #else
+// static HumanFaceDetectMSR01 s1(0.3F, 0.5F, 10, 0.2F);
+// #endif
 
 #if CONFIG_ESP_FACE_RECOGNITION_ENABLED
 static int8_t recognition_enabled = 0;
@@ -267,45 +282,6 @@ void enable_led(bool en) {  // Turn LED On or Off
 }
 #endif
 
-// handler new
-
-esp_err_t _http_event_handler(esp_http_client_event_t *evt)
-{
-  switch (evt->event_id) {
-    case HTTP_EVENT_ERROR:
-      Serial.println("HTTP_EVENT_ERROR");
-      break;
-    case HTTP_EVENT_ON_CONNECTED:
-      Serial.println("HTTP_EVENT_ON_CONNECTED");
-      break;
-    case HTTP_EVENT_HEADER_SENT:
-      Serial.println("HTTP_EVENT_HEADER_SENT");
-      break;
-    case HTTP_EVENT_ON_HEADER:
-      Serial.println();
-      Serial.printf("HTTP_EVENT_ON_HEADER, key=%s, value=%s", evt->header_key, evt->header_value);
-      break;
-    case HTTP_EVENT_ON_DATA:
-      Serial.println();
-      Serial.printf("HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
-      if (!esp_http_client_is_chunked_response(evt->client)) {
-        // Write out data
-        // printf("%.*s", evt->data_len, (char*)evt->data);
-      }
-      break;
-    case HTTP_EVENT_ON_FINISH:
-      Serial.println("");
-      Serial.println("HTTP_EVENT_ON_FINISH");
-      break;
-    case HTTP_EVENT_DISCONNECTED:
-      Serial.println("HTTP_EVENT_DISCONNECTED");
-      break;
-  }
-  return ESP_OK;
-}
-
-
-
 static esp_err_t bmp_handler(httpd_req_t *req) {
   camera_fb_t *fb = NULL;
   esp_err_t res = ESP_OK;
@@ -357,6 +333,7 @@ static size_t jpg_encode_stream(void *arg, size_t index, const void *data, size_
   return len;
 }
 
+// ### handle caputereeeee
 static esp_err_t capture_handler(httpd_req_t *req) {
   camera_fb_t *fb = NULL;
   esp_err_t res = ESP_OK;
@@ -382,34 +359,6 @@ static esp_err_t capture_handler(httpd_req_t *req) {
   httpd_resp_set_type(req, "image/jpeg");
   httpd_resp_set_hdr(req, "Content-Disposition", "inline; filename=capture.jpg");
   httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
-  // send  to server
-
-  esp_http_client_handle_t http_client;
-  esp_http_client_config_t config_client = {0};
-  config_client.url = servername;
-  config_client.event_handler = _http_event_handler;
-  config_client.method = HTTP_METHOD_POST;
-
-  http_client = esp_http_client_init(&config_client);
-
-  esp_http_client_set_post_field(http_client, postdata, strlen(postdata));
-
-  http_client = esp_http_client_init(&config_client);
-  
-  esp_http_client_set_post_field(http_client, (const char *)fb->buf, fb->len);
-
-  esp_http_client_set_header(http_client, "Content-Type", "image/jpg");
-
-  esp_err_t err = esp_http_client_perform(http_client);
-
-   if (err == ESP_OK) {
-    Serial.print("esp_http_client_get_status_code: ");
-    Serial.println(esp_http_client_get_status_code(http_client));
-  }
-
-  esp_http_client_cleanup(http_client);
-
-  // #################
 
   char ts[32];
   snprintf(ts, 32, "%lld.%06ld", fb->timestamp.tv_sec, fb->timestamp.tv_usec);
@@ -631,7 +580,6 @@ static esp_err_t stream_handler(httpd_req_t *req) {
 #if CONFIG_ESP_FACE_DETECT_ENABLED
       } else {
         if (fb->format == PIXFORMAT_RGB565
-        
 #if CONFIG_ESP_FACE_RECOGNITION_ENABLED
             && !recognition_enabled
 #endif
@@ -1186,12 +1134,13 @@ static esp_err_t index_handler(httpd_req_t *req) {
   if (s != NULL) {
     if (s->id.PID == OV5640_PID) {
       return httpd_resp_send(req, (const char *)index_ov5640_html_gz, index_ov5640_html_gz_len);
+    } 
   } else {
     log_e("Camera sensor not found");
     return httpd_resp_send_500(req);
   }
 }
-}
+
 void startCameraServer() {
   httpd_config_t config = HTTPD_DEFAULT_CONFIG();
   config.max_uri_handlers = 16;
@@ -1360,6 +1309,8 @@ void startCameraServer() {
     httpd_register_uri_handler(camera_httpd, &greg_uri);
     httpd_register_uri_handler(camera_httpd, &pll_uri);
     httpd_register_uri_handler(camera_httpd, &win_uri);
+    // httpd_register_uri_handler(camera_httpd, &take_photo);
+
   }
 
   config.server_port += 1;
