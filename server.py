@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from flask_mysqldb import MySQL
 import easyocr
 import os
@@ -32,23 +32,31 @@ UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # endpoind home
-@app.route('/')
+@app.route('/get_ocr_results', methods=['GET'])
 def home():
     cursor = mysql.connection.cursor()
-    cursor.execute("""SELECT * from ocr_results""")
-    rv = cursor.fetchall()
-    return {
-        "status": "succes",
-        "data": rv
-    }
+    cursor.execute("""SELECT * from ocr_results ORDER BY id DESC  limit 10""")
+    data = cursor.fetchall()
+    cursor.close()
+   
+    # Format data ke JSON
+    results = [{"image_name": row[0], "ocr_text": row[2]} for row in data]
+    return jsonify(results)
+
+
+@app.route('/ocr_results_page')
+def ocr_results_page():
+    return render_template('result.html')
 
 
 
-
-
-# end2
+# endpoind upload
 @app.route('/upload', methods=['POST'])
 def upload_image():
+    print("Headers: ", request.headers)
+    print("Form: ", request.form)
+    print("Files: ", request.files)
+    
     if 'file' not in request.files:
         return jsonify({"error": "No file part"}), 400
 
@@ -132,4 +140,4 @@ def upload_image():
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)

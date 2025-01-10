@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data KTP</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f4f4f4;
+        }
+    </style>
+</head>
+<body>
+    <h1>Data KTP</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>No</th>
+                <th>Data</th>
+            </tr>
+        </thead>
+        <tbody id="ocr-results">
+            <!-- Data akan dimuat di sini -->
+        </tbody>
+    </table>
+    <script>
+        // Fetch data dari endpoint Flask
+        fetch('/get_ocr_results')
+            .then(response => response.json())
+            .then(data => {
+                const tbody = document.getElementById('ocr-results');
+                data.forEach(item => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${item.image_name}</td>
+                        <td>${item.ocr_text}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            })
+            .catch(error => {
+                console.error('Error fetching OCR results:', error);
+            });
+    </script>
+</body>
+</html>
